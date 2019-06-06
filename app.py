@@ -14,10 +14,10 @@ import re
 import numpy as np
 from hashlib import sha256
 
-server = MongoClient('mongodb+srv://root:root@cluster0-axobn.mongodb.net/test?retryWrites=true&w=majority')
+server = MongoClient('mongodb+srv://lucascsll:lucas#2019@cluster0-n6oqv.azure.mongodb.net/test?retryWrites=true&w=majority')
 uclcoindb = server.uclcoin
 blockchain = BlockChain(mongodb=uclcoindb)
-domain = 'https://piv.azurewebsites.net' #Insert your domain
+domain = 'https://pichain5.azurewebsites.net' #Insert your domain
 consecutives_invalids_blocks = 0
 
 app = Flask(__name__)
@@ -261,7 +261,7 @@ def get_ranking():
 @app.route('/keypair', methods=['GET'])
 def generate_key():
     wallet = KeyPair()
-    rs =  [{'private_key':f'{wallet.private_key}'},{'public_key':f'{wallet.public_key}'}]
+    rs =  [{'private_key':f'{wallet.public_key}'},{'public_key':f'{wallet.private_key}'}]
     return jsonify(rs), 200
 
 if __name__ == '__main__':
