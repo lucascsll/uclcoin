@@ -18,7 +18,6 @@ server = MongoClient('mongodb+srv://lucascsll:lucas#2019@cluster0-n6oqv.azure.mo
 uclcoindb = server.uclcoin
 blockchain = BlockChain(mongodb=uclcoindb)
 domain = 'https://pichain5.azurewebsites.net' #Insert your domain
-consecutives_invalids_blocks = 0
 
 app = Flask(__name__)
 
@@ -79,14 +78,13 @@ def consensus():
     for response in responses:
         if response != None and response.status_code == 200:
             blocks = response.json()
-            if len(blocks) > current_len:    
+            if len(blocks) > current_len:
+                current_len = len(blocks)    
                 blockchain.clear()    
                 for block in blocks:
                     temp_block = Block.from_dict(block)
                     blockchain.add_block(temp_block)
                 result = True
-        current_len = blockchain._blocks.count()
-
 
     return result
 
@@ -135,23 +133,21 @@ def add_block():
     try:
         block_json = request.get_json(force=True)
         block = Block.from_dict(block_json)
-        blockchain.validate_block(block)
         rs = (grequests.post(f'{node["address"]}/validate', data=request.data) for node in json.loads(get_nodes()))
         responses = grequests.map(rs)
         validated_chains = 1
         unvalidated_chains = 0
         total_valids = 2
-        total_unvalids = 3
+        total_unvalids = 4
         for response in responses:
-            if response != None:
-                if response.status_code == 201:
-                    validated_chains += 1
-                elif response.status_code == 400:
-                    unvalidated_chains += 1
-                    if unvalidated_chains == total_unvalids:
-                        break
-                if validated_chains == total_valids:
-                    break      
+            if response.status_code == 201:
+                validated_chains += 1
+            if validated_chains == total_valids:
+                break 
+            elif response.status_code == 400:
+                unvalidated_chains += 1
+                if unvalidated_chains == total_unvalids:
+                    break
         if validated_chains == total_valids:
             blockchain.add_block(block)
             announce_new_block(block_json)
@@ -164,11 +160,6 @@ def add_block():
     except (KeyError, TypeError, ValueError):
         return jsonify({'message': f'Invalid block format'}), 400
     except BlockchainException as bce:
-        consecutives_invalids_blocks += 1
-        if consecutives_invalids_blocks == 3:
-            consensus()
-            consecutives_invalids_blocks = 0
-            return jsonify({'message': 'Blockchain was Outdated'}), 400
         return jsonify({'message': f'Block rejected: {block}'}), 400
 
 
@@ -190,13 +181,11 @@ def validate_block():
     try:
         block = request.get_json(force=True)
         block = Block.from_dict(block)
-        BlockChain.validate_block(block)
         return jsonify({'message': f'Block #{block.index} is a valid block!'}), 201
     except (KeyError, TypeError, ValueError):
         return jsonify({'message': f'Invalid block format'}), 400
     except BlockchainException as bce:
         return jsonify({'message': f'Invalid block: {bce}'}), 400
-
 
 @app.route('/transaction', methods=['POST'])
 def add_transaction():
@@ -216,7 +205,6 @@ def add_transaction():
     except BlockchainException as bce:
         return jsonify({'message': f'Transaction rejected: {bce}'}), 400
 
-
 @app.route('/transaction/<private_key>/<public_key>/<value>', methods=['POST'])
 def add_transaction2(private_key, public_key, value):
     try:
@@ -226,7 +214,6 @@ def add_transaction2(private_key, public_key, value):
         return jsonify({'message': f'Pending transaction {transaction.tx_hash} added to the Blockchain'}), 201
     except BlockchainException as bce:
         return jsonify({'message': f'Transaction rejected: {bce}'}), 400
-
 
 @app.route('/avgtimes', methods=['GET'])
 def get_averages():
@@ -265,6 +252,18 @@ def generate_key():
     wallet = KeyPair()
     rs =  [{'private_key':f'{wallet.private_key}'},{'public_key':f'{wallet.public_key}'}]
     return jsonify(rs), 200
+
+@app.route('/reset_blockchain', methods=['GET'])
+def get_reset_blockchain():
+    BlockChain.clear()
+    return jsonify({'message':'Blockchain reseted successfuly'}), 200
+
+@app.route('/reset_all_blockchains', methods=['GET'])
+def get_reset_all_blockchains():
+    for node in json.loads(get_nodes()):
+        address = node['address']
+        url = "{}/reset_blockchain".format(address)
+        requests.get(url)
 
 if __name__ == '__main__':
     app.run()
