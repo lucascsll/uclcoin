@@ -85,6 +85,8 @@ def consensus():
                     temp_block = Block.from_dict(block)
                     blockchain.add_block(temp_block)
                 result = True
+        current_len = blockchain._blocks.count()
+
 
     return result
 
