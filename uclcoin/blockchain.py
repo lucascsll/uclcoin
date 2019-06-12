@@ -74,6 +74,7 @@ class BlockChain(object):
 
     def clear(self):
         self._blocks.drop()
+        self._pending_transactions.drop()
 
     def calculate_hash_difficulty(self, index=None):
         if index is None:
@@ -100,6 +101,20 @@ class BlockChain(object):
                 balance -= transaction.amount + transaction.fee
             if transaction.destination == address:
                 balance += transaction.amount
+        return balance
+
+    def get_balance_future(self, address):
+        balance = 0
+        for transaction in self.pending_transactions:
+            if transaction.destination == address:
+                balance += transaction.amount
+        return balance
+
+    def get_balance_discount(self, address):
+        balance = 0
+        for transaction in self.pending_transactions:
+            if transaction.source == address:
+                balance -= transaction.amount + transaction.fee
         return balance
 
     def get_balance(self, address):
